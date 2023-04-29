@@ -7,8 +7,11 @@ Good luck and happy searching!
 
 import logging
 
+from pacai.student import search
 from pacai.core.actions import Actions
-from pacai.core.search import heuristic
+from pacai.core.directions import Directions
+from pacai.core.distance import manhattan
+from pacai.core.distance import maze
 from pacai.core.search.position import PositionSearchProblem
 from pacai.core.search.problem import SearchProblem
 from pacai.agents.base import BaseAgent
@@ -63,8 +66,38 @@ class CornersProblem(SearchProblem):
             if not startingGameState.hasFood(*corner):
                 logging.warning('Warning: no food in corner ' + str(corner))
 
-        # *** Your Code Here ***
-        raise NotImplementedError()
+    def startingState(self):
+        return (self.startingPosition, [])
+
+    def isGoal(self, state):
+        node = state[0]
+        visited_corners = state[1]
+
+        if node in self.corners:
+            if node not in visited_corners:
+                visited_corners.append(node)
+            return len(visited_corners) == 4
+        return False
+
+    def successorStates(self, state):
+        x, y = state[0]
+        visited_corners = state[1]
+        successors = []
+        for action in Directions.CARDINAL:
+            dx, dy = Actions.directionToVector(action)
+            next_x, next_y = int(x + dx), int(y + dy)
+            hitsWall = self.walls[next_x][next_y]
+            if not hitsWall:
+                successor_visited_corners = list(visited_corners)
+                next_node = (next_x, next_y)
+                if next_node in self.corners:
+                    if next_node not in successor_visited_corners:
+                        successor_visited_corners.append(next_node)
+                successor = ((next_node, successor_visited_corners), action, 1)
+                successors.append(successor)
+        self._numExpanded += 1
+
+        return successors
 
     def actionsCost(self, actions):
         """
@@ -95,12 +128,20 @@ def cornersHeuristic(state, problem):
     (You need not worry about consistency for this heuristic to receive full credit.)
     """
 
-    # Useful information.
-    # corners = problem.corners  # These are the corner coordinates
-    # walls = problem.walls  # These are the walls of the maze, as a Grid.
-
-    # *** Your Code Here ***
-    return heuristic.null(state, problem)  # Default to trivial solution
+    corners = problem.corners
+    node = state[0]
+    visited_corners = state[1]
+    corners_left = []
+    for corner in corners:
+        if corner not in visited_corners:
+            corners_left.append(corner)
+    if len(corners_left) == 0:
+        return 0
+    nearest_corners = []
+    for corner in corners_left:
+        nearest_corners.append(manhattan(corner, node))
+        corners_left.remove(corner)
+    return min(nearest_corners)
 
 def foodHeuristic(state, problem):
     """
@@ -132,9 +173,13 @@ def foodHeuristic(state, problem):
     """
 
     position, foodGrid = state
-
-    # *** Your Code Here ***
-    return heuristic.null(state, problem)  # Default to the null heuristic.
+    gameState = problem.startingGameState
+    heuristic_cost = 0
+    food_left = foodGrid.asList()
+    for food in food_left:
+        if heuristic_cost < maze(position, food, gameState):
+            heuristic_cost = maze(position, food, gameState)
+    return heuristic_cost
 
 class ClosestDotSearchAgent(SearchAgent):
     """
@@ -176,7 +221,8 @@ class ClosestDotSearchAgent(SearchAgent):
         # problem = AnyFoodSearchProblem(gameState)
 
         # *** Your Code Here ***
-        raise NotImplementedError()
+        problem = AnyFoodSearchProblem(gameState)
+        return search.uniformCostSearch(problem)
 
 class AnyFoodSearchProblem(PositionSearchProblem):
     """
@@ -203,7 +249,14 @@ class AnyFoodSearchProblem(PositionSearchProblem):
         super().__init__(gameState, goal = None, start = start)
 
         # Store the food for later reference.
+
         self.food = gameState.getFood()
+
+    def isGoal(self, state):
+        if state in self.food.asList():
+            return True
+        else:
+            return False
 
 class ApproximateSearchAgent(BaseAgent):
     """

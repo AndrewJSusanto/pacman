@@ -2,6 +2,7 @@ import random
 
 from pacai.agents.base import BaseAgent
 from pacai.agents.search.multiagent import MultiAgentSearchAgent
+from pacai.core import distance
 
 class ReflexAgent(BaseAgent):
     """
@@ -47,18 +48,25 @@ class ReflexAgent(BaseAgent):
         Make sure to understand the range of different values before you combine them
         in your evaluation function.
         """
-
-        successorGameState = currentGameState.generatePacmanSuccessor(action)
-
-        # Useful information you can extract.
+        
+        # Useful information you can extract:
         # newPosition = successorGameState.getPacmanPosition()
         # oldFood = currentGameState.getFood()
         # newGhostStates = successorGameState.getGhostStates()
         # newScaredTimes = [ghostState.getScaredTimer() for ghostState in newGhostStates]
 
-        # *** Your Code Here ***
+        score = 0
+        successorGameState = currentGameState.generatePacmanSuccessor(action)
+        newPosition = currentGameState.getPacmanPosition()
+        ghostPositions = currentGameState.getGhostPositions()
+        closestGhost = min(distance.manhattan(newPosition, ghostPosition) for ghostPosition in ghostPositions)
+        oldFood = currentGameState.getFood()
+        closestFood = min(distance.manhattan(newPosition, foodPosition) for foodPosition in oldFood.asList())
+        score = closestFood / (closestGhost * 20)
+        if action == "Stop":
+            score -= 50
 
-        return successorGameState.getScore()
+        return successorGameState.getScore() + score 
 
 class MinimaxAgent(MultiAgentSearchAgent):
     """
@@ -89,6 +97,54 @@ class MinimaxAgent(MultiAgentSearchAgent):
 
     def __init__(self, index, **kwargs):
         super().__init__(index, **kwargs)
+    
+    def getAction(self, gameState): # get_value generates a pair in the form of (value, action), and getAction returns the action (index 1) 
+        result = self.get_value(0, 0, gameState)
+        return result[1]
+        
+    def get_value(self, index, depth, gameState): # returns values differing depending on whether or not state is terminal, max-, or min-
+        if len(gameState.getLegalActions(index)) == 0: # if index has no legal actions, then terminal case.
+            return (gameState.getScore(), "") # Terminal case, game is over
+        if index == 0:
+            return self.max_value(index, depth, gameState) # Pacman's index is always 0: Max agent
+        else:
+            return self.min_value(index, depth, gameState) # Ghosts indices are always > 1: Min agent (index is not 0 or )
+            
+        
+    def max_value(self, index, depth, gameState):  # Max utility value for max agent
+        legalMoves = gameState.getLegalActions(index) 
+        max_value = float("-inf")
+        action = ""
+        for checkAction in legalMoves:
+            successor = gameState.generateSuccessor(index, checkAction)
+            successorIndex = index + 1
+            successorDepth = depth
+            if successorIndex == gameState.getNumAgents():
+                successorIndex = 0
+                successorDepth += 1
+            current_value = self.get_value(successor, successorIndex, successorDepth)[0]
+            if current_value > max_value:
+                max_value = current_value
+                action = checkAction
+        return max_value, action
+    
+    def min_value(self, index, depth, gameState): # Min utility value for ghosts / min agent
+        legalMoves = gameState.getLegalActions(index)
+        min_value = float("inf")
+        action = ""
+        for checkAction in legalMoves:
+            successor = gameState.generateSuccesor(index, checkAction)
+            successorIndex = index + 1
+            successorDepth = depth
+            if successorIndex == gameState.getNumAgents():
+                successorIndex = 0
+                successorDepth += 1
+            current_value = self.get_value(successor, successorIndex, successorDepth)[0]
+            if current_value < min_value:
+                min_value = current_value
+                action = checkAction
+        return min_value, action
+        
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """

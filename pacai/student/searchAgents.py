@@ -176,7 +176,7 @@ def foodHeuristic(state, problem):
     gameState = problem.startingGameState
     heuristic_cost = 0
     food_left = foodGrid.asList()
-    for food in food_left:
+    for food in food_left:  
         if heuristic_cost < maze(position, food, gameState):
             heuristic_cost = maze(position, food, gameState)
     return heuristic_cost

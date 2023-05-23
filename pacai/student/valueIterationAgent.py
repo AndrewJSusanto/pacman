@@ -36,10 +36,43 @@ class ValueIterationAgent(ValueEstimationAgent):
         self.mdp = mdp
         self.discountRate = discountRate
         self.iters = iters
-        self.values = {}  # A dictionary which holds the q-values for each state.
+        self.values = {}   # A dictionary which holds the q-values for each state.
 
         # Compute the values here.
-        raise NotImplementedError()
+        for state in self.mdp.getStates():  # Assign a value of 0 for each state
+            if not self.mdp.isTerminal(state):
+                self.values[state] = 0.0
+
+        nextVals = self.values.copy()
+        states = self.mdp.getStates()
+        for i in range(iters):  # for each state in the set of states, compute V(s)
+            for state in states:
+                actions = self.mdp.getPossibleActions(state)
+                if not self.mdp.isTerminal(state):
+                    stateVals = {}  # q-values for actions of this state
+                    for action in actions:
+                        stateVals[action] = self.getQValue(state, action)
+                    nextVals[state] = stateVals[max(stateVals, key=stateVals.get)]
+            self.values = nextVals.copy()
+
+    def getQValue(self, state, action):
+        tProbabilities = self.mdp.getTransitionStatesAndProbs(state, action)
+        qValue = 0.0
+        for tsp in tProbabilities:  # transition tuple of (state, probability)
+            tState, probability = tsp
+            reward = self.mdp.getReward(state, action, tState)
+            tSample = self.discountRate * self.getValue(tState)  # sample = gamma * value(s')
+            qValue += (probability * (reward + tSample))
+        return qValue
+
+    def getPolicy(self, state):
+        if self.mdp.isTerminal(state):
+            return None
+        actions = self.mdp.getPossibleActions(state)
+        policy = {}
+        for action in actions:
+            policy[action] = self.getQValue(state, action)
+        return max(policy, key=policy.get)  # returns action with best q-value
 
     def getValue(self, state):
         """
